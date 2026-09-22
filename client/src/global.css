@@ -1,0 +1,181 @@
+:root {
+  --font-primary: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #070b14;
+  color: #f8fafc;
+  font-family: var(--font-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #070b14;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+  border: 1px solid rgba(6, 182, 212, 0.1);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Plasma Orb Modern Glowing Loader */
+.plasma-loader-container {
+  --color-one: #06b6d4;
+  --color-two: #8b5cf6;
+  --color-three: rgba(6, 182, 212, 0.6);
+  --color-four: rgba(139, 92, 246, 0.6);
+  --color-five: rgba(6, 182, 212, 0.25);
+  --time-animation: 2s;
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 35px 0 var(--color-three),
+    0 20px 60px 0 var(--color-four);
+  animation: plasma-colorize calc(var(--time-animation) * 3) ease-in-out infinite;
+}
+
+.plasma-loader-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border-top: solid 1.5px var(--color-one);
+  border-bottom: solid 1.5px var(--color-two);
+  background: linear-gradient(180deg, var(--color-five), var(--color-four));
+  box-shadow:
+    inset 0 12px 14px 0 var(--color-three),
+    inset 0 -12px 14px 0 var(--color-four);
+}
+
+.plasma-loader-container .box {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(
+    180deg,
+    var(--color-one) 25%,
+    var(--color-two) 75%
+  );
+  mask: url(#plasma-clipping);
+  -webkit-mask: url(#plasma-clipping);
+}
+
+.plasma-loader-container svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.plasma-loader-container svg #plasma-clipping {
+  filter: contrast(15);
+  animation: plasma-roundness calc(var(--time-animation) / 2) linear infinite;
+}
+
+.plasma-loader-container svg #plasma-clipping polygon {
+  filter: blur(7px);
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(1) {
+  transform-origin: 75% 25%;
+  transform: rotate(90deg);
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(2) {
+  transform-origin: 50% 50%;
+  animation: plasma-rotation var(--time-animation) linear infinite reverse;
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(3) {
+  transform-origin: 50% 60%;
+  animation: plasma-rotation var(--time-animation) linear infinite;
+  animation-delay: calc(var(--time-animation) / -3);
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(4) {
+  transform-origin: 40% 40%;
+  animation: plasma-rotation var(--time-animation) linear infinite reverse;
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(5) {
+  transform-origin: 40% 40%;
+  animation: plasma-rotation var(--time-animation) linear infinite reverse;
+  animation-delay: calc(var(--time-animation) / -2);
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(6) {
+  transform-origin: 60% 40%;
+  animation: plasma-rotation var(--time-animation) linear infinite;
+}
+
+.plasma-loader-container svg #plasma-clipping polygon:nth-child(7) {
+  transform-origin: 60% 40%;
+  animation: plasma-rotation var(--time-animation) linear infinite;
+  animation-delay: calc(var(--time-animation) / -1.5);
+}
+
+@keyframes plasma-rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes plasma-roundness {
+  0% {
+    filter: contrast(15);
+  }
+  20% {
+    filter: contrast(3);
+  }
+  40% {
+    filter: contrast(3);
+  }
+  60% {
+    filter: contrast(15);
+  }
+  100% {
+    filter: contrast(15);
+  }
+}
+
+@keyframes plasma-colorize {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  25% {
+    filter: hue-rotate(25deg);
+  }
+  50% {
+    filter: hue-rotate(50deg);
+  }
+  75% {
+    filter: hue-rotate(25deg);
+  }
+  100% {
+    filter: hue-rotate(0deg);
+  }
+}

@@ -1,0 +1,27 @@
+.venv
+venv
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+client/node_modules/
+client/dist/
+.npm/
+
+# Git & OS
+.git/
+.gitignore
+.DS_Store
+*.log
+.gemini/
+.agents/
+.idea/
+.vscode/

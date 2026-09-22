@@ -1,0 +1,24 @@
+{
+  "name": "nexus-rag",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Production RAG Assistant with Qdrant Vector Database, Multi-Provider Fallbacks, and Real-Time SSE Token Streaming",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "build:client": "npm --prefix client run build",
+    "start": "./start.sh",
+    "test": "PYTHONPATH=. pytest backend/tests/test_rag.py"
+  },
+  "keywords": [
+    "rag",
+    "qdrant",
+    "react",
+    "fastapi",
+    "typescript",
+    "vector-database"
+  ],
+  "author": "",
+  "license": "MIT"
+}
