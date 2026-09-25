@@ -513,7 +513,14 @@ export async function streamChatQuery(
   }
 
   if (!response.ok || !response.body) {
-    throw new Error(`Chat stream request failed: HTTP ${response.status}`);
+    if (response.status === 429) {
+      const errData = await response.json().catch(() => null);
+      const retryAfter = response.headers.get("Retry-After") || (errData?.retry_after_seconds ? `${errData.retry_after_seconds}s` : "a minute");
+      const msg = errData?.detail || `Rate limit reached (max 4 requests/min). Please wait ${retryAfter} before asking another question.`;
+      throw new Error(msg);
+    }
+    const errData = await response.json().catch(() => null);
+    throw new Error(errData?.detail || `Chat stream request failed: HTTP ${response.status}`);
   }
 
   const reader = response.body.getReader();

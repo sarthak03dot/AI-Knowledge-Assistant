@@ -692,6 +692,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
                     </Button>
                   </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          size="small"
+                          sx={{
+                            color: "#64748b",
+                            "&.Mui-checked": { color: "#06b6d4" },
+                            p: 0.5,
+                            mr: 0.5,
+                          }}
+                        />
+                      }
+                      label={<Typography sx={{ fontSize: "0.75rem", color: "#94a3b8" }}>Remember me on this device</Typography>}
+                    />
+                  </Box>
                 </Box>
 
                 {/* Actions */}
@@ -864,44 +882,64 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 {/* Checkbox: Terms for Register / Forgot Password for Login */}
                 {tab === "register" ? (
-                  <Box sx={{ display: "flex", alignItems: "center", mt: -0.5 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={agreeTerms}
-                          onChange={(e) => setAgreeTerms(e.target.checked)}
-                          size="small"
-                          sx={{
-                            color: "#64748b",
-                            "&.Mui-checked": { color: "#06b6d4" },
-                            p: 0.5,
-                            mr: 0.5,
-                          }}
-                        />
-                      }
-                      label={
-                        <Typography sx={{ fontSize: "0.75rem", color: "#94a3b8", userSelect: "none" }}>
-                          I agree to the{" "}
-                          <Box
-                            component="span"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setIsTermsOpen(true);
-                            }}
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, mt: -0.5 }}>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={agreeTerms}
+                            onChange={(e) => setAgreeTerms(e.target.checked)}
+                            size="small"
                             sx={{
-                              color: "#f8fafc",
-                              fontWeight: 600,
-                              textDecoration: "underline",
-                              cursor: "pointer",
-                              "&:hover": { color: "#22d3ee" },
+                              color: "#64748b",
+                              "&.Mui-checked": { color: "#06b6d4" },
+                              p: 0.5,
+                              mr: 0.5,
                             }}
-                          >
-                            Terms & Conditions
-                          </Box>
-                        </Typography>
-                      }
-                    />
+                          />
+                        }
+                        label={
+                          <Typography sx={{ fontSize: "0.75rem", color: "#94a3b8", userSelect: "none" }}>
+                            I agree to the{" "}
+                            <Box
+                              component="span"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsTermsOpen(true);
+                              }}
+                              sx={{
+                                color: "#f8fafc",
+                                fontWeight: 600,
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                                "&:hover": { color: "#22d3ee" },
+                              }}
+                            >
+                              Terms & Conditions
+                            </Box>
+                          </Typography>
+                        }
+                      />
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            size="small"
+                            sx={{
+                              color: "#64748b",
+                              "&.Mui-checked": { color: "#06b6d4" },
+                              p: 0.5,
+                              mr: 0.5,
+                            }}
+                          />
+                        }
+                        label={<Typography sx={{ fontSize: "0.75rem", color: "#94a3b8" }}>Remember me on this device</Typography>}
+                      />
+                    </Box>
                   </Box>
                 ) : (
                   <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: -0.5 }}>

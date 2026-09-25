@@ -18,7 +18,6 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # Copy backend source code and data assets
 COPY backend/ ./backend/
-COPY data/ ./data/
 
 # Create persistent runtime data directories
 RUN mkdir -p backend/data/qdrant_storage backend/data/documents

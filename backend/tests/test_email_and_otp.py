@@ -20,6 +20,8 @@ def test_email_service_fallback_and_html_generation():
 
 
 def test_full_registration_otp_verification_flow():
+    from backend.rate_limiter import limiter
+    limiter.reset()
     timestamp = int(time.time() * 1000)
     email = f"otp_user_{timestamp}@testdomain.com"
     name = "OTP Verification User"
@@ -51,6 +53,7 @@ def test_full_registration_otp_verification_flow():
     assert "Incorrect" in bad_otp_res.json()["detail"] or "invalid" in bad_otp_res.json()["detail"].lower()
 
     # 4. Test resend OTP functionality
+    limiter.reset()
     resend_res = client.post("/api/auth/resend-otp", json={"email": email})
     assert resend_res.status_code == 200
     assert resend_res.json()["status"] == "success"
@@ -78,6 +81,7 @@ def test_full_registration_otp_verification_flow():
     assert db_manager.get_pending_registration(email) is None
 
     # 7. Test login with newly verified account
+    limiter.reset()
     login_res = client.post(
         "/api/auth/login",
         json={"email": email, "password": password},

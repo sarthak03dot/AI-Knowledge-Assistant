@@ -88,6 +88,8 @@ def test_auth_register_login_and_refresh_flow():
     assert new_access_token != access_token
 
     # 4. Use new access token to query /me
+    from backend.rate_limiter import limiter
+    limiter.reset()
     me_new_res = client.get('/api/auth/me', headers={'Authorization': f'Bearer {new_access_token}'})
     assert me_new_res.status_code == 200
     assert me_new_res.json()['email'] == email

@@ -4,7 +4,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/client
 COPY client/package*.json ./
-RUN npm ci
+RUN npm ci || npm install
 COPY client/ ./
 RUN npm run build
 
@@ -21,12 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Copy backend code, sample data, and built frontend
+# Copy backend code and built frontend bundle
 COPY backend/ ./backend/
 COPY --from=frontend-builder /app/client/dist ./client/dist
 
-# Ensure local data directories exist
-RUN mkdir -p backend/data/qdrant_storage
+# Ensure local runtime storage directories exist
+RUN mkdir -p backend/data/qdrant_storage backend/data/documents
 
 # Environment variables
 ENV PORT=8000 \
@@ -35,5 +35,9 @@ ENV PORT=8000 \
 
 EXPOSE 8000
 
-# Start FastAPI server with Uvicorn
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/api/health || exit 1
+
+# Start FastAPI server with Uvicorn (dynamically honoring Render's $PORT)
 CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

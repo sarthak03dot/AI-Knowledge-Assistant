@@ -41,6 +41,7 @@ from .db.cloudinary_service import cloudinary_service
 from .auth.routes import auth_router
 from .payments.routes import router as payments_router
 from .auth.security import get_current_user, get_current_user_optional
+from .rate_limiter import RateLimitMiddleware, limiter
 from fastapi import Depends
 
 # Initialize FastAPI App
@@ -58,6 +59,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Enforce IP-Based Rate Limiting (Max 4 requests per minute per IP)
+app.add_middleware(RateLimitMiddleware, rate_limiter=limiter)
 
 # Mount Routers
 app.include_router(auth_router)
