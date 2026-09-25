@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import type { Stats, DocumentItem, User, ChatSession } from "../types/rag";
 import {
@@ -29,18 +30,20 @@ import LayersIcon from "@mui/icons-material/Layers";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+
 interface SidebarProps {
   stats: Stats | null;
   documents: DocumentItem[];
   currentUser: User | null;
-  activeTab: "documents" | "chat" | "playground" | "assets" | "billing";
-  onSelectTab: (tab: "documents" | "chat" | "playground" | "assets" | "billing") => void;
+  activeTab: "documents" | "chat" | "playground" | "assets" | "billing" | "admin";
+  onSelectTab: (tab: "documents" | "chat" | "playground" | "assets" | "billing" | "admin") => void;
   onUploadFiles: (files: FileList | File[]) => void;
   onInspectDoc: (docId: string, docName: string) => void;
   onDeleteDoc: (docId: string) => void;
   onOpenSettings: () => void;
   onOpenPricing?: () => void;
-  onOpenAuth: () => void;
+  onOpenAuth: () => void
   onLogout: () => void;
   isUploading: boolean;
   sidebarWidth: number;
@@ -72,10 +75,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const userPlan = currentUser?.plan || "free";
   const userName = currentUser?.name || "Explorer";
   const userEmail = currentUser?.email || "user@example.com";
+  const isAdmin = currentUser?.role === "admin" || currentUser?.is_admin === true;
 
   // Regular primary navigation items
   const navItems: Array<{
-    key: "chat" | "documents" | "playground";
+    key: "chat" | "documents" | "playground" | "admin";
     label: string;
     icon: React.ReactElement;
     badge?: string | number;
@@ -97,6 +101,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: "Search & Knowledge Lab",
       icon: <CategoryOutlinedIcon sx={{ fontSize: 18 }} />,
     },
+    ...(isAdmin
+      ? [
+          {
+            key: "admin" as const,
+            label: "Admin Panel",
+            icon: <AdminPanelSettingsIcon sx={{ fontSize: 18, color: "#ec4899" }} />,
+            badge: "ADMIN",
+          },
+        ]
+      : []),
   ];
 
   const filteredChats = chats.filter((c) =>
@@ -550,6 +564,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </Typography>
           </Box>
         </MenuItem>
+
+        {isAdmin && (
+          <MenuItem
+            onClick={() => {
+              handleProfileClose();
+              onSelectTab("admin");
+            }}
+            sx={{
+              borderRadius: 2,
+              py: 1,
+              px: 1.5,
+              my: 0.25,
+              bgcolor: "rgba(236, 72, 153, 0.08)",
+              "&:hover": { bgcolor: "rgba(236, 72, 153, 0.18)" },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 32, color: "#ec4899" }}>
+              <AdminPanelSettingsIcon sx={{ fontSize: 18 }} />
+            </ListItemIcon>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#f472b6", lineHeight: 1.2 }}>
+                Admin Command Center
+              </Typography>
+              <Typography sx={{ fontSize: "0.68rem", color: "#fda4af" }}>
+                Manage quotas, pricing & users
+              </Typography>
+            </Box>
+          </MenuItem>
+        )}
 
         <MenuItem
           onClick={() => {

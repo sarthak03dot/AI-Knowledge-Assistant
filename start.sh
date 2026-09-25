@@ -54,7 +54,11 @@ if [ ! -d "client/dist" ]; then
     (cd client && npm install && npm run build)
 fi
 
-# 5. Start Server based on mode
+# 5. Check and seed database with Admin & standard accounts if missing
+echo "🌱 Checking and seeding default Admin and User accounts..."
+"$VENV_PYTHON" -m backend.db.seed
+
+# 6. Start Server based on mode
 if [ "$MODE" = "--prod" ] || [ "$MODE" = "prod" ]; then
     echo "🚀 Starting Production Multi-Worker Server at http://0.0.0.0:8000 ..."
     "$VENV_PYTHON" -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 2

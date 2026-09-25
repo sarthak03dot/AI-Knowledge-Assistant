@@ -109,7 +109,7 @@ class IPRateLimiter:
 
 
 # Singleton instance initialized from environment variables
-DEFAULT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_PER_MINUTE", "4"))
+DEFAULT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
 DEFAULT_WINDOW_SECONDS = float(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60.0"))
 
 limiter = IPRateLimiter(
@@ -120,7 +120,7 @@ limiter = IPRateLimiter(
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Middleware that intercepts incoming API requests and applies the 4 req/min rate limit.
+    Middleware that intercepts incoming API requests and applies the sliding window rate limit.
     """
 
     def __init__(

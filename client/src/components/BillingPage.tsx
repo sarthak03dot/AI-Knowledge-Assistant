@@ -160,6 +160,21 @@ export const BillingPage: React.FC<BillingPageProps> = ({
     loadData();
   }, [loadData]);
 
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window !== "undefined" && (window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleUpgrade = async (plan: PricingPlan) => {
     if (!currentUser) {
       if (onOpenAuth) onOpenAuth();
@@ -182,9 +197,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({
         order.is_sandbox ||
         !order.order_id ||
         order.order_id.startsWith("order_sandbox_") ||
-        order.order_id.startsWith("order_sim_") ||
-        typeof window === "undefined" ||
-        !(window as any).Razorpay;
+        order.order_id.startsWith("order_sim_");
 
       if (isSandboxOrder) {
         // Direct sandbox simulated verification
@@ -206,6 +219,7 @@ export const BillingPage: React.FC<BillingPageProps> = ({
       }
 
       // 3. Launch live/test Razorpay Standard Checkout Popup
+      await loadRazorpayScript();
       const options = {
         key: order.key_id,
         amount: order.amount,

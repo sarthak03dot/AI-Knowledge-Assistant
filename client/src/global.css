@@ -4,6 +4,7 @@
 
 * {
   box-sizing: border-box;
+  border-radius: 0.4rem !important;
 }
 
 body {
@@ -47,7 +48,7 @@ body {
   position: relative;
   width: 100px;
   height: 100px;
-  border-radius: 50%;
+  border-radius: 50% !important;
   box-shadow:
     0 0 35px 0 var(--color-three),
     0 20px 60px 0 var(--color-four);
@@ -73,11 +74,9 @@ body {
 .plasma-loader-container .box {
   width: 100px;
   height: 100px;
-  background: linear-gradient(
-    180deg,
-    var(--color-one) 25%,
-    var(--color-two) 75%
-  );
+  background: linear-gradient(180deg,
+      var(--color-one) 25%,
+      var(--color-two) 75%);
   mask: url(#plasma-clipping);
   -webkit-mask: url(#plasma-clipping);
 }
@@ -139,6 +138,7 @@ body {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -148,15 +148,19 @@ body {
   0% {
     filter: contrast(15);
   }
+
   20% {
     filter: contrast(3);
   }
+
   40% {
     filter: contrast(3);
   }
+
   60% {
     filter: contrast(15);
   }
+
   100% {
     filter: contrast(15);
   }
@@ -166,15 +170,19 @@ body {
   0% {
     filter: hue-rotate(0deg);
   }
+
   25% {
     filter: hue-rotate(25deg);
   }
+
   50% {
     filter: hue-rotate(50deg);
   }
+
   75% {
     filter: hue-rotate(25deg);
   }
+
   100% {
     filter: hue-rotate(0deg);
   }

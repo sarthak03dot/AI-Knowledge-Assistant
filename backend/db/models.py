@@ -22,12 +22,18 @@ class UserResponse(BaseModel):
     email: str
     name: str
     avatar_color: str = "#6366f1"
+    role: str = "user"
+    is_admin: bool = False
     created_at: float
     document_ids: List[str] = []
     documents_count: int = 0
+    query_count: int = 0
     plan: str = "free"
     plan_status: str = "active"
     plan_updated_at: Optional[float] = None
+    offer_note: Optional[str] = None
+    custom_doc_limit: Optional[int] = None
+    custom_query_limit: Optional[int] = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -58,4 +64,23 @@ class AuthResponse(BaseModel):
     token: str
     user: UserResponse
     db_engine: str
+
+
+class AdminUserUpdateRole(BaseModel):
+    role: str
+
+
+class AdminUserUpdatePlan(BaseModel):
+    plan: str
+    plan_status: Optional[str] = "active"
+    offer_note: Optional[str] = None
+    custom_doc_limit: Optional[int] = None
+    custom_query_limit: Optional[int] = None
+
+
+class SystemSettingsUpdate(BaseModel):
+    rate_limit_per_minute: Optional[int] = None
+    plans: Optional[Dict[str, Any]] = None
+    payment_gateway: Optional[Dict[str, Any]] = None
+    ai_settings: Optional[Dict[str, Any]] = None
 

@@ -16,6 +16,10 @@ import type {
   PaymentHistoryItem,
   PlanUsage,
   DocumentPreviewResponse,
+  AdminDashboardData,
+  SystemSettings,
+  AdminUserItem,
+  AdminPaymentItem,
 } from "../types/rag";
 
 export const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
@@ -555,4 +559,133 @@ export async function streamChatQuery(
       }
     }
   }
+}
+
+// -------------------------------------------------------------
+// ADMIN PANEL API
+// -------------------------------------------------------------
+export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/dashboard`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to load admin dashboard" }));
+    throw new Error(err.detail || "Forbidden: Admin privileges required.");
+  }
+  return res.json();
+}
+
+export async function fetchSystemSettings(): Promise<SystemSettings> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/settings`);
+  if (!res.ok) throw new Error("Failed to fetch system settings");
+  return res.json();
+}
+
+export async function updateSystemSettings(payload: Partial<SystemSettings>): Promise<{ status: string; settings: SystemSettings }> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to update settings" }));
+    throw new Error(err.detail || "Failed to update settings");
+  }
+  return res.json();
+}
+
+export async function fetchAdminUsers(
+  search: string = "",
+  skip: number = 0,
+  limit: number = 50,
+  role: string = "",
+  plan: string = "",
+  status: string = ""
+): Promise<{ users: AdminUserItem[]; total: number; skip: number; limit: number }> {
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (role) params.append("role", role);
+  if (plan) params.append("plan", plan);
+  if (status) params.append("status", status);
+  params.append("skip", String(skip));
+  params.append("limit", String(limit));
+
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/users?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch users list");
+  return res.json();
+}
+
+export async function updateAdminUserRole(userId: string, role: "admin" | "user"): Promise<any> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/users/${userId}/role`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to update role" }));
+    throw new Error(err.detail || "Failed to update user role");
+  }
+  return res.json();
+}
+
+export async function updateAdminUserPlan(
+  userId: string,
+  plan: string,
+  planStatus: string = "active",
+  offerNote?: string,
+  customDocLimit?: number,
+  customQueryLimit?: number
+): Promise<any> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/users/${userId}/plan`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      plan,
+      plan_status: planStatus,
+      offer_note: offerNote,
+      custom_doc_limit: customDocLimit,
+      custom_query_limit: customQueryLimit,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to update plan" }));
+    throw new Error(err.detail || "Failed to update user plan");
+  }
+  return res.json();
+}
+
+export async function deleteAdminUser(userId: string): Promise<any> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/users/${userId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to delete user" }));
+    throw new Error(err.detail || "Failed to delete user");
+  }
+  return res.json();
+}
+
+export async function fetchAdminPayments(
+  skip: number = 0,
+  limit: number = 50,
+  search: string = "",
+  status: string = "",
+  planId: string = ""
+): Promise<{ payments: AdminPaymentItem[]; total: number; skip: number; limit: number }> {
+  const params = new URLSearchParams();
+  if (search) params.append("search", search);
+  if (status) params.append("status", status);
+  if (planId) params.append("plan_id", planId);
+  params.append("skip", String(skip));
+  params.append("limit", String(limit));
+
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/payments?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch payments history");
+  return res.json();
+}
+
+export async function updateAdminRateLimit(limitPerMin: number): Promise<any> {
+  const res = await fetchWithAuth(`${API_BASE}/api/admin/rate-limit?limit_per_min=${limitPerMin}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to update rate limit");
+  return res.json();
 }

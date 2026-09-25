@@ -40,6 +40,7 @@ from .db.database import db_manager
 from .db.cloudinary_service import cloudinary_service
 from .auth.routes import auth_router
 from .payments.routes import router as payments_router
+from .admin.routes import admin_router
 from .auth.security import get_current_user, get_current_user_optional
 from .rate_limiter import RateLimitMiddleware, limiter
 from fastapi import Depends
@@ -66,6 +67,7 @@ app.add_middleware(RateLimitMiddleware, rate_limiter=limiter)
 # Mount Routers
 app.include_router(auth_router)
 app.include_router(payments_router)
+app.include_router(admin_router)
 
 # Global Qdrant Vector DB Instance (Embedded on-disk or remote)
 vector_db = QdrantVectorStore(storage_path=os.path.join(BASE_DIR, "backend", "data", "qdrant_storage"), vector_dim=768)
@@ -78,6 +80,16 @@ os.makedirs(DOCS_STORAGE_DIR, exist_ok=True)
 
 CLIENT_DIR = os.path.join(BASE_DIR, "client")
 CLIENT_DIST = os.path.join(CLIENT_DIR, "dist")
+
+
+@app.on_event("startup")
+def on_startup_seed():
+    """Auto-seed default Admin and User accounts if not present."""
+    try:
+        from .db.seed import seed_database
+        seed_database()
+    except Exception as e:
+        print(f"[Startup] Seed check notice: {e}")
 
 
 # -------------------------------------------------------------
@@ -425,6 +437,17 @@ async def upload_files(
     indexes vectors into Qdrant with user isolation, and registers metadata in MongoDB Atlas.
     """
     user_id = user["id"]
+    user_doc = db_manager.get_user_by_id(user_id) or user
+    user_plan = user_doc.get("plan", "free")
+    doc_limit = db_manager.get_plan_doc_limit(user_plan)
+
+    existing_docs = db_manager.get_user_documents(user_id)
+    if len(existing_docs) + len(files) > doc_limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Upload rejected: Your current '{user_plan.capitalize()}' plan limit is {doc_limit} documents (currently using {len(existing_docs)}). Please upgrade in the Billing tab.",
+        )
+
     results = []
 
     for file in files:
@@ -510,6 +533,17 @@ def ingest_raw_text(
     user: dict = Depends(get_current_user),
 ):
     user_id = user["id"]
+    user_doc = db_manager.get_user_by_id(user_id) or user
+    user_plan = user_doc.get("plan", "free")
+    doc_limit = db_manager.get_plan_doc_limit(user_plan)
+
+    existing_docs = db_manager.get_user_documents(user_id)
+    if len(existing_docs) + 1 > doc_limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Creation rejected: Your current '{user_plan.capitalize()}' plan limit is {doc_limit} documents (currently using {len(existing_docs)}). Please upgrade in the Billing tab.",
+        )
+
     doc_id = str(uuid.uuid4())[:8]
     metadata = req.metadata or {}
     metadata["user_id"] = user_id
@@ -617,6 +651,18 @@ async def chat_stream(
     user: Optional[dict] = Depends(get_current_user_optional),
 ):
     user_id = user["id"] if user else None
+    if user_id:
+        user_doc = db_manager.get_user_by_id(user_id) or user
+        user_plan = user_doc.get("plan", "free")
+        query_limit = db_manager.get_plan_query_limit(user_plan)
+        current_queries = user_doc.get("query_count", 0)
+        if current_queries >= query_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Chat query quota reached ({current_queries}/{query_limit}) for the {user_plan.capitalize()} plan. Please upgrade your plan in Billing to continue.",
+            )
+        db_manager.increment_user_query_count(user_id)
+
     history_dicts = [{"role": m.role, "content": m.content} for m in req.chat_history] if req.chat_history else []
     generator = pipeline.stream_answer_query(
         query=req.query,
@@ -647,6 +693,18 @@ def chat(
     user: Optional[dict] = Depends(get_current_user_optional),
 ):
     user_id = user["id"] if user else None
+    if user_id:
+        user_doc = db_manager.get_user_by_id(user_id) or user
+        user_plan = user_doc.get("plan", "free")
+        query_limit = db_manager.get_plan_query_limit(user_plan)
+        current_queries = user_doc.get("query_count", 0)
+        if current_queries >= query_limit:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Chat query quota reached ({current_queries}/{query_limit}) for the {user_plan.capitalize()} plan. Please upgrade your plan in Billing to continue.",
+            )
+        db_manager.increment_user_query_count(user_id)
+
     history_dicts = [{"role": m.role, "content": m.content} for m in req.chat_history] if req.chat_history else []
     response = pipeline.answer_query(
         query=req.query,

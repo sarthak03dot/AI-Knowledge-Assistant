@@ -67,14 +67,28 @@ def _create_token(payload_dict: Dict[str, Any], expire_seconds: int) -> str:
     return f"{header_b64}.{payload_b64}.{sig_b64}"
 
 
-def create_access_token(user_id: str, email: str, name: str) -> str:
+def create_access_token(user_id: str, email: str, name: str, role: str = "user", is_admin: bool = False) -> str:
     """Create a signed JWT access token (24h)."""
-    return _create_token({"sub": user_id, "email": email, "name": name, "token_type": "access"}, ACCESS_TOKEN_EXPIRE_SECONDS)
+    return _create_token({
+        "sub": user_id,
+        "email": email,
+        "name": name,
+        "role": role,
+        "is_admin": is_admin,
+        "token_type": "access",
+    }, ACCESS_TOKEN_EXPIRE_SECONDS)
 
 
-def create_refresh_token(user_id: str, email: str, name: str) -> str:
+def create_refresh_token(user_id: str, email: str, name: str, role: str = "user", is_admin: bool = False) -> str:
     """Create a signed JWT refresh token (30 days)."""
-    return _create_token({"sub": user_id, "email": email, "name": name, "token_type": "refresh"}, REFRESH_TOKEN_EXPIRE_SECONDS)
+    return _create_token({
+        "sub": user_id,
+        "email": email,
+        "name": name,
+        "role": role,
+        "is_admin": is_admin,
+        "token_type": "refresh",
+    }, REFRESH_TOKEN_EXPIRE_SECONDS)
 
 
 def decode_token(token: str, expected_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -129,10 +143,17 @@ def get_current_user_optional(authorization: Optional[str] = Header(None)) -> Op
     if not payload:
         return None
 
+    email = (payload.get("email") or "").strip().lower()
+    admin_emails = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "admin@nexusrag.ai,sarthak@example.com").split(",") if e.strip()]
+    is_admin = bool(payload.get("is_admin") or payload.get("role") == "admin" or email in admin_emails or email.startswith("admin@"))
+    role = "admin" if is_admin else (payload.get("role") or "user")
+
     return {
         "id": payload.get("sub"),
         "email": payload.get("email"),
         "name": payload.get("name"),
+        "role": role,
+        "is_admin": is_admin,
     }
 
 
@@ -144,5 +165,32 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, A
             status_code=401,
             detail="Authentication required. Please sign in to access this resource.",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+def get_current_admin(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Admin-only authentication dependency."""
+    user = get_current_user(authorization)
+
+    # Check database status for real-time promotion/demotion
+    try:
+        from backend.db.database import db_manager
+        db_user = db_manager.get_user_by_id(user["id"])
+        if db_user:
+            email = (db_user.get("email") or "").strip().lower()
+            admin_emails = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "admin@nexusrag.ai,sarthak@example.com").split(",") if e.strip()]
+            is_admin = bool(db_user.get("role") == "admin" or db_user.get("is_admin") is True or email in admin_emails or email.startswith("admin@"))
+            if is_admin:
+                db_user["is_admin"] = True
+                db_user["role"] = "admin"
+                return db_user
+    except Exception:
+        pass
+
+    if not user.get("is_admin") and user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: You do not have administrator permissions.",
         )
     return user

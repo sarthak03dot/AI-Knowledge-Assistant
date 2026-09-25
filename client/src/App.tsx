@@ -27,6 +27,7 @@ import { PricingModal } from "./components/PricingModal";
 import { ConfirmationModal } from "./components/ConfirmationModal";
 import { DocumentViewerModal } from "./components/DocumentViewerModal";
 import { PlasmaLoader } from "./components/PlasmaLoader";
+import { AdminPanel } from "./components/AdminPanel";
 
 const SIDEBAR_WIDTH = 300;
 
@@ -37,7 +38,7 @@ export const App: React.FC = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [activeTab, setActiveTab] = useState<"documents" | "chat" | "playground" | "assets" | "billing">("chat");
+  const [activeTab, setActiveTab] = useState<"documents" | "chat" | "playground" | "assets" | "billing" | "admin">("chat");
   const [topK, setTopK] = useState(4);
   const [alpha, setAlpha] = useState(0.65);
   const [telemetryStatus, setTelemetryStatus] = useState("Ready");
@@ -404,6 +405,8 @@ export const App: React.FC = () => {
               onOpenAuth={() => setIsAuthOpen(true)}
               onSwitchToChat={() => setActiveTab("chat")}
             />
+          ) : activeTab === "admin" ? (
+            <AdminPanel onBackToApp={() => setActiveTab("chat")} />
           ) : (
             <VectorPlayground topK={topK} alpha={alpha} />
           )}

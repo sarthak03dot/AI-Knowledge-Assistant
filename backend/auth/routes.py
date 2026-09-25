@@ -134,6 +134,10 @@ def verify_otp(req: VerifyOTPRequest):
     access_token = create_access_token(user_id=user_id, email=pending["email"], name=pending["name"])
     refresh_token = create_refresh_token(user_id=user_id, email=pending["email"], name=pending["name"])
 
+    user_record = db_manager.get_user_by_id(user_id)
+    role = user_record.get("role", "user") if user_record else "user"
+    is_admin = bool(user_record.get("is_admin", False)) if user_record else False
+
     return AuthResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -143,9 +147,12 @@ def verify_otp(req: VerifyOTPRequest):
             email=pending["email"],
             name=pending["name"],
             avatar_color=pending["avatar_color"],
+            role=role,
+            is_admin=is_admin,
             created_at=created_at,
             document_ids=[],
             documents_count=0,
+            query_count=0,
             plan="free",
             plan_status="active",
             plan_updated_at=None,
@@ -199,7 +206,7 @@ def login(req: UserLogin):
     if not verify_password(password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
-    access_token = create_access_token(user_id=user["id"], email=user["email"], name=user["name"])
+    access_token = create_access_token(user_id=user["id"], email=user["email"], name=user["name"], role=user.get("role", "user"), is_admin=user.get("is_admin", False))
     refresh_token = create_refresh_token(user_id=user["id"], email=user["email"], name=user["name"])
     doc_ids = user.get("document_ids", [])
 
@@ -212,9 +219,12 @@ def login(req: UserLogin):
             email=user["email"],
             name=user["name"],
             avatar_color=user.get("avatar_color", "#6366f1"),
+            role=user.get("role", "user"),
+            is_admin=bool(user.get("is_admin", False)),
             created_at=user["created_at"],
             document_ids=doc_ids,
             documents_count=len(doc_ids),
+            query_count=user.get("query_count", 0),
             plan=user.get("plan", "free"),
             plan_status=user.get("plan_status", "active"),
             plan_updated_at=user.get("plan_updated_at"),
@@ -234,7 +244,7 @@ def refresh_token(req: RefreshTokenRequest):
     if not user:
         raise HTTPException(status_code=401, detail="User account no longer exists.")
 
-    new_access_token = create_access_token(user_id=user["id"], email=user["email"], name=user["name"])
+    new_access_token = create_access_token(user_id=user["id"], email=user["email"], name=user["name"], role=user.get("role", "user"), is_admin=user.get("is_admin", False))
     new_refresh_token = create_refresh_token(user_id=user["id"], email=user["email"], name=user["name"])
     doc_ids = user.get("document_ids", [])
 
@@ -247,9 +257,12 @@ def refresh_token(req: RefreshTokenRequest):
             email=user["email"],
             name=user["name"],
             avatar_color=user.get("avatar_color", "#6366f1"),
+            role=user.get("role", "user"),
+            is_admin=bool(user.get("is_admin", False)),
             created_at=user["created_at"],
             document_ids=doc_ids,
             documents_count=len(doc_ids),
+            query_count=user.get("query_count", 0),
             plan=user.get("plan", "free"),
             plan_status=user.get("plan_status", "active"),
             plan_updated_at=user.get("plan_updated_at"),
@@ -271,9 +284,12 @@ def get_me(current_user: dict = Depends(get_current_user)):
         email=user["email"],
         name=user["name"],
         avatar_color=user.get("avatar_color", "#6366f1"),
+        role=user.get("role", "user"),
+        is_admin=bool(user.get("is_admin", False)),
         created_at=user["created_at"],
         document_ids=doc_ids,
         documents_count=len(doc_ids),
+        query_count=user.get("query_count", 0),
         plan=user.get("plan", "free"),
         plan_status=user.get("plan_status", "active"),
         plan_updated_at=user.get("plan_updated_at"),

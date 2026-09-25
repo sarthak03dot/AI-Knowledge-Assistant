@@ -46,24 +46,27 @@ def test_fastapi_rate_limiter_integration():
 
     client = TestClient(app)
     custom_ip = "10.0.0.99"
+    original_limit = global_limiter.max_requests
+    global_limiter.max_requests = 4
     global_limiter.reset_for_ip(custom_ip)
 
-    headers = {"X-Forwarded-For": custom_ip}
+    try:
+        headers = {"X-Forwarded-For": custom_ip}
 
-    # 4 requests should succeed
-    for i in range(4):
-        resp = client.get("/api/health", headers=headers)
-        assert resp.status_code == 200, f"Call {i+1} failed with {resp.status_code}: {resp.text}"
-        assert "X-RateLimit-Limit" in resp.headers
-        assert resp.headers["X-RateLimit-Limit"] == "4"
+        # 4 requests should succeed
+        for i in range(4):
+            resp = client.get("/api/health", headers=headers)
+            assert resp.status_code == 200, f"Call {i+1} failed with {resp.status_code}: {resp.text}"
+            assert "X-RateLimit-Limit" in resp.headers
+            assert resp.headers["X-RateLimit-Limit"] == "4"
 
-    # 5th request should receive 429 Too Many Requests
-    resp5 = client.get("/api/health", headers=headers)
-    assert resp5.status_code == 429, f"Expected 429, got {resp5.status_code}"
-    data = resp5.json()
-    assert "Rate limit exceeded" in data.get("detail", "")
-    assert "Retry-After" in resp5.headers
-    assert resp5.headers["X-RateLimit-Remaining"] == "0"
-
-    # Clean up
-    global_limiter.reset_for_ip(custom_ip)
+        # 5th request should receive 429 Too Many Requests
+        resp5 = client.get("/api/health", headers=headers)
+        assert resp5.status_code == 429, f"Expected 429, got {resp5.status_code}"
+        data = resp5.json()
+        assert "Rate limit exceeded" in data.get("detail", "")
+        assert "Retry-After" in resp5.headers
+        assert resp5.headers["X-RateLimit-Remaining"] == "0"
+    finally:
+        global_limiter.max_requests = original_limit
+        global_limiter.reset_for_ip(custom_ip)

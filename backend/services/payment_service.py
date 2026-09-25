@@ -15,6 +15,25 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional
 
+import os
+import hmac
+import hashlib
+import json
+import base64
+import urllib.request
+import urllib.error
+from typing import Dict, Any, Optional
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ENV_FILE = os.path.join(BASE_DIR, ".env")
+if os.path.exists(ENV_FILE):
+    with open(ENV_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ[k.strip()] = v.strip()
+
 # Load environment variables
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "").strip()
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
@@ -94,7 +113,14 @@ class PaymentService:
         self.is_live = bool(self.key_id and self.key_secret and not self.key_id.startswith("rzp_test_placeholder"))
 
     def get_plans(self) -> Dict[str, Any]:
-        """Return available pricing plans."""
+        """Return available pricing plans from DB settings or static defaults."""
+        try:
+            from backend.db.database import db_manager
+            settings = db_manager.get_system_settings()
+            if "plans" in settings and settings["plans"]:
+                return settings["plans"]
+        except Exception:
+            pass
         return PRICING_PLANS
 
     def create_order(
@@ -110,7 +136,8 @@ class PaymentService:
         Amount is converted to paise (INR * 100).
         """
         self._refresh_keys()
-        plan = PRICING_PLANS.get(plan_id.lower())
+        plans = self.get_plans()
+        plan = plans.get(plan_id.lower())
         if not plan:
             raise ValueError(f"Invalid plan ID: '{plan_id}'")
 
@@ -155,7 +182,7 @@ class PaymentService:
 
                 with urllib.request.urlopen(req, timeout=10) as resp:
                     res_data = json.loads(resp.read().decode("utf-8"))
-                    print(f"[Razorpay] ✅ Order created successfully: {res_data.get('id')}")
+                    print(f"[Razorpay] Order created successfully: {res_data.get('id')}")
                     return {
                         "order_id": res_data["id"],
                         "amount": res_data["amount"],
@@ -168,7 +195,7 @@ class PaymentService:
                         "is_sandbox": False,
                     }
             except Exception as err:
-                print(f"[Razorpay] ⚠️ API request notice: {err}. Falling back to sandbox order simulation.")
+                print(f"[Razorpay] API notice: {err}. Falling back to sandbox order mode.")
 
         # Sandbox / Fallback Order Generation for Development
         mock_order_id = f"order_sandbox_{hashlib.md5(f'{receipt}_{amount_in_paise}'.encode()).hexdigest()[:14]}"

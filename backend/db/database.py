@@ -1,6 +1,6 @@
 """
 Database Connection & Persistence Layer
-Primary (and only): MongoDB Atlas Cloud Database
+Primary: MongoDB Atlas Cloud Database with Admin System Settings & Analytics
 """
 
 import os
@@ -20,12 +20,97 @@ if os.path.exists(ENV_FILE):
 MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME") or "nexus_rag"
 
+DEFAULT_SYSTEM_SETTINGS = {
+    "key": "global_config",
+    "rate_limit_per_minute": int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
+    "plans": {
+        "free": {
+            "id": "free",
+            "name": "Free Starter",
+            "tagline": "For individual testing & basic document Q&A",
+            "price_monthly": 0,
+            "price_yearly": 0,
+            "currency": "INR",
+            "document_limit": 5,
+            "chunk_limit": 500,
+            "query_limit": 50,
+            "features": [
+                "Up to 5 Documents",
+                "Up to 500 Passages",
+                "50 AI Queries / month",
+                "Executive Analyst AI Persona",
+                "Standard Hybrid Search (Dense + Sparse)",
+                "Direct Document Attachment",
+                "Community Support",
+            ],
+            "badge": "Current Default",
+        },
+        "pro": {
+            "id": "pro",
+            "name": "Pro Intelligence",
+            "tagline": "For researchers, developers & professionals",
+            "price_monthly": 999,
+            "price_yearly": 9590,
+            "currency": "INR",
+            "document_limit": 100,
+            "chunk_limit": 10000,
+            "query_limit": 2000,
+            "features": [
+                "Up to 100 Documents",
+                "Up to 10,000 Passages",
+                "2,000 AI Queries / month",
+                "All 5 AI Personas + Custom Builder",
+                "Multi-Document Synthesis & Cross-Analysis",
+                "Priority Low-Latency LLM Queue",
+                "PDF & Markdown Report Exporting",
+                "Email & Priority Support",
+            ],
+            "badge": "Most Popular",
+            "highlight": True,
+        },
+        "enterprise": {
+            "id": "enterprise",
+            "name": "Enterprise Suite",
+            "tagline": "For teams, large knowledge bases & organizations",
+            "price_monthly": 4999,
+            "price_yearly": 47990,
+            "currency": "INR",
+            "document_limit": 1000,
+            "chunk_limit": 999999,
+            "query_limit": 999999,
+            "features": [
+                "Unlimited Documents & Passages",
+                "Unlimited AI Queries",
+                "Dedicated Qdrant Vector Storage",
+                "Global Cross-Workspace Deep Reasoning",
+                "Custom Enterprise Personas & Role Access",
+                "Full API Access & Webhooks Integration",
+                "Dedicated Cloudinary Storage Partition",
+                "24/7 Enterprise SLA Support",
+            ],
+            "badge": "Maximum Power",
+        },
+    },
+    "payment_gateway": {
+        "provider": "Razorpay",
+        "enabled": True,
+        "currency": "INR",
+        "test_mode": False,
+    },
+    "ai_settings": {
+        "default_llm_provider": "auto",
+        "default_top_k": 4,
+        "default_alpha": 0.65,
+    },
+}
+
 
 class DatabaseManager:
     def __init__(self):
         self.db_type = "MongoDB Atlas"
         self.mongo_client = None
         self.mongo_db = None
+        self._cached_settings = None
         self._init_db()
 
     def _init_db(self):
@@ -55,14 +140,83 @@ class DatabaseManager:
             self.mongo_db.chats.create_index([("id", ASCENDING)], unique=True)
             self.mongo_db.payments.create_index([("user_id", ASCENDING)])
             self.mongo_db.payments.create_index([("order_id", ASCENDING)], unique=True)
+            self.mongo_db.settings.create_index([("key", ASCENDING)], unique=True)
 
-            print(f"[Database] ✅ Connected to MongoDB Atlas — database: '{MONGODB_DB_NAME}'")
+            print(f"[Database] Connected to MongoDB Atlas - database: '{MONGODB_DB_NAME}'")
 
         except Exception as e:
             raise RuntimeError(
-                f"[Database] ❌ Failed to connect to MongoDB Atlas: {e}\n"
+                f"[Database] Failed to connect to MongoDB Atlas: {e}\n"
                 "Check your MONGODB_URI in the .env file and ensure your IP is whitelisted in Atlas."
             )
+
+    # ------------------------------------------------------------------
+    # SYSTEM SETTINGS & DYNAMIC CONFIG
+    # ------------------------------------------------------------------
+    def get_system_settings(self) -> Dict[str, Any]:
+        """Fetch global admin settings from MongoDB with fallback to defaults."""
+        try:
+            doc = self.mongo_db.settings.find_one({"key": "global_config"})
+            if doc:
+                merged = dict(DEFAULT_SYSTEM_SETTINGS)
+                for k, v in doc.items():
+                    if k != "_id":
+                        if isinstance(v, dict) and isinstance(merged.get(k), dict):
+                            merged[k] = {**merged[k], **v}
+                        else:
+                            merged[k] = v
+                self._cached_settings = merged
+                return merged
+        except Exception:
+            pass
+
+        return DEFAULT_SYSTEM_SETTINGS
+
+    def update_system_settings(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update system settings in MongoDB."""
+        current = self.get_system_settings()
+        for k, v in updates.items():
+            if v is not None:
+                if isinstance(v, dict) and isinstance(current.get(k), dict):
+                    current[k].update(v)
+                else:
+                    current[k] = v
+
+        current["updated_at"] = time.time()
+        self.mongo_db.settings.update_one(
+            {"key": "global_config"},
+            {"$set": current},
+            upsert=True,
+        )
+        self._cached_settings = current
+
+        # If rate limit updated, synchronize with active limiter
+        if "rate_limit_per_minute" in updates and updates["rate_limit_per_minute"]:
+            try:
+                from backend.rate_limiter import limiter
+                limiter.max_requests = int(updates["rate_limit_per_minute"])
+            except Exception:
+                pass
+
+        return current
+
+    def get_plan_doc_limit(self, plan_id: str, custom_limit: Optional[int] = None) -> int:
+        """Get max documents allowed for a specific plan or custom limit."""
+        if custom_limit is not None and custom_limit > 0:
+            return custom_limit
+        settings = self.get_system_settings()
+        plans = settings.get("plans", DEFAULT_SYSTEM_SETTINGS["plans"])
+        plan_data = plans.get(plan_id.lower()) or plans.get("free", {})
+        return plan_data.get("document_limit", 5)
+
+    def get_plan_query_limit(self, plan_id: str, custom_limit: Optional[int] = None) -> int:
+        """Get max chat queries allowed for a specific plan or custom limit."""
+        if custom_limit is not None and custom_limit > 0:
+            return custom_limit
+        settings = self.get_system_settings()
+        plans = settings.get("plans", DEFAULT_SYSTEM_SETTINGS["plans"])
+        plan_data = plans.get(plan_id.lower()) or plans.get("free", {})
+        return plan_data.get("query_limit", 50)
 
     # ------------------------------------------------------------------
     # USER OPERATIONS
@@ -70,15 +224,31 @@ class DatabaseManager:
     def _serialize_user(self, user_doc: dict, doc_ids: Optional[list] = None) -> Dict[str, Any]:
         """Convert a MongoDB user document to a clean dict."""
         ids = doc_ids if doc_ids is not None else user_doc.get("document_ids", [])
+        email = user_doc["email"]
+        admin_emails = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "admin@nexusrag.ai,sarthak@example.com").split(",") if e.strip()]
+        is_admin = bool(
+            user_doc.get("role") == "admin"
+            or user_doc.get("is_admin") is True
+            or email.strip().lower() in admin_emails
+            or email.strip().lower().startswith("admin@")
+        )
+        role = "admin" if is_admin else user_doc.get("role", "user")
+
         return {
             "id": str(user_doc.get("id") or user_doc.get("_id")),
-            "email": user_doc["email"],
+            "email": email,
             "name": user_doc["name"],
             "hashed_password": user_doc.get("hashed_password", ""),
             "avatar_color": user_doc.get("avatar_color", "#6366f1"),
+            "role": role,
+            "is_admin": is_admin,
             "plan": user_doc.get("plan", "free"),
             "plan_status": user_doc.get("plan_status", "active"),
             "plan_updated_at": float(user_doc["plan_updated_at"]) if user_doc.get("plan_updated_at") else None,
+            "offer_note": user_doc.get("offer_note"),
+            "custom_doc_limit": user_doc.get("custom_doc_limit"),
+            "custom_query_limit": user_doc.get("custom_query_limit"),
+            "query_count": int(user_doc.get("query_count", 0)),
             "created_at": float(user_doc.get("created_at", 0)),
             "document_ids": ids,
             "documents_count": len(ids),
@@ -101,19 +271,110 @@ class DatabaseManager:
         avatar_color: str,
         created_at: float,
         plan: str = "free",
+        role: str = "user",
     ):
+        admin_emails = [e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "admin@nexusrag.ai,sarthak@example.com").split(",") if e.strip()]
+        is_admin = role == "admin" or email.strip().lower() in admin_emails or email.strip().lower().startswith("admin@")
+        actual_role = "admin" if is_admin else role
+
         self.mongo_db.users.insert_one({
             "id": user_id,
             "email": email.strip().lower(),
             "name": name,
             "hashed_password": hashed_password,
             "avatar_color": avatar_color,
+            "role": actual_role,
+            "is_admin": is_admin,
             "plan": plan,
             "plan_status": "active",
             "plan_updated_at": None,
+            "query_count": 0,
             "created_at": created_at,
             "document_ids": [],
         })
+
+    def increment_user_query_count(self, user_id: str) -> int:
+        """Increment user's total chat queries count."""
+        res = self.mongo_db.users.find_one_and_update(
+            {"id": user_id},
+            {"$inc": {"query_count": 1}},
+            return_document=True,
+        )
+        return res.get("query_count", 1) if res else 1
+
+    def get_all_users(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        search: str = "",
+        role: str = "",
+        plan: str = "",
+        status: str = "",
+    ) -> Dict[str, Any]:
+        """Fetch filtered and paginated registered users with total count for Admin panel."""
+        query: Dict[str, Any] = {}
+        if search:
+            query["$or"] = [
+                {"email": {"$regex": search, "$options": "i"}},
+                {"name": {"$regex": search, "$options": "i"}},
+                {"id": {"$regex": search, "$options": "i"}},
+            ]
+        if role:
+            query["role"] = role.lower()
+        if plan:
+            query["plan"] = plan.lower()
+        if status:
+            query["plan_status"] = status.lower()
+
+        total = self.mongo_db.users.count_documents(query)
+        cursor = self.mongo_db.users.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        users = [self._serialize_user(u) for u in cursor]
+        return {"users": users, "total": total}
+
+    def update_user_role(self, user_id: str, role: str) -> bool:
+        """Update user role (admin vs user)."""
+        is_admin = (role == "admin")
+        res = self.mongo_db.users.update_one(
+            {"id": user_id},
+            {"$set": {"role": role, "is_admin": is_admin}},
+        )
+        return res.modified_count > 0 or res.matched_count > 0
+
+    def update_user_plan_admin(
+        self,
+        user_id: str,
+        plan: str,
+        plan_status: str = "active",
+        offer_note: Optional[str] = None,
+        custom_doc_limit: Optional[int] = None,
+        custom_query_limit: Optional[int] = None,
+    ) -> bool:
+        """Admin override for user subscription plan and special offers."""
+        update_doc: Dict[str, Any] = {
+            "plan": plan,
+            "plan_status": plan_status,
+            "plan_updated_at": time.time(),
+        }
+        if offer_note is not None:
+            update_doc["offer_note"] = offer_note
+        if custom_doc_limit is not None:
+            update_doc["custom_doc_limit"] = custom_doc_limit
+        if custom_query_limit is not None:
+            update_doc["custom_query_limit"] = custom_query_limit
+
+        res = self.mongo_db.users.update_one(
+            {"id": user_id},
+            {"$set": update_doc},
+        )
+        return res.modified_count > 0 or res.matched_count > 0
+
+    def delete_user_by_admin(self, user_id: str) -> bool:
+        """Permanently delete user, documents, and chats."""
+        self.mongo_db.documents.delete_many({"user_id": user_id})
+        self.mongo_db.chats.delete_many({"user_id": user_id})
+        self.mongo_db.payments.delete_many({"user_id": user_id})
+        res = self.mongo_db.users.delete_one({"id": user_id})
+        return res.deleted_count > 0
 
     def upgrade_user_plan(
         self,
@@ -202,6 +463,76 @@ class DatabaseManager:
             }
             for p in cursor
         ]
+
+    def get_all_payments(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        search: str = "",
+        status: str = "",
+        plan_id: str = "",
+    ) -> Dict[str, Any]:
+        """Retrieve filtered & paginated payment records with total count for Admin panel."""
+        query: Dict[str, Any] = {}
+        if status:
+            query["status"] = status.lower()
+        if plan_id:
+            query["plan_id"] = plan_id.lower()
+        if search:
+            query["$or"] = [
+                {"order_id": {"$regex": search, "$options": "i"}},
+                {"payment_id": {"$regex": search, "$options": "i"}},
+                {"user_id": {"$regex": search, "$options": "i"}},
+            ]
+
+        total = self.mongo_db.payments.count_documents(query)
+        cursor = self.mongo_db.payments.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        payments = []
+        for p in cursor:
+            user = self.get_user_by_id(p.get("user_id", ""))
+            payments.append({
+                "id": p.get("id"),
+                "user_id": p.get("user_id"),
+                "user_email": user.get("email") if user else "Unknown",
+                "user_name": user.get("name") if user else "Unknown",
+                "order_id": p.get("order_id"),
+                "payment_id": p.get("payment_id"),
+                "plan_id": p.get("plan_id"),
+                "billing_cycle": p.get("billing_cycle", "monthly"),
+                "amount": p.get("amount", 0),
+                "currency": p.get("currency", "INR"),
+                "status": p.get("status", "paid"),
+                "created_at": float(p.get("created_at", 0)),
+            })
+        return {"payments": payments, "total": total}
+
+    def get_admin_metrics(self) -> Dict[str, Any]:
+        """Aggregate high-level telemetry, subscriptions, and financial metrics."""
+        total_users = self.mongo_db.users.count_documents({})
+        free_users = self.mongo_db.users.count_documents({"plan": "free"})
+        pro_users = self.mongo_db.users.count_documents({"plan": "pro"})
+        enterprise_users = self.mongo_db.users.count_documents({"plan": "enterprise"})
+        total_docs = self.mongo_db.documents.count_documents({})
+        total_chats = self.mongo_db.chats.count_documents({})
+
+        # Calculate total revenue from completed payments
+        paid_payments = list(self.mongo_db.payments.find({"status": "paid"}))
+        total_revenue_paise = sum(p.get("amount", 0) for p in paid_payments)
+        total_revenue_inr = total_revenue_paise / 100.0
+
+        return {
+            "total_users": total_users,
+            "plan_breakdown": {
+                "free": free_users,
+                "pro": pro_users,
+                "enterprise": enterprise_users,
+            },
+            "total_documents": total_docs,
+            "total_chats": total_chats,
+            "total_revenue_inr": total_revenue_inr,
+            "total_paid_orders": len(paid_payments),
+            "recent_payments": self.get_all_payments(limit=10),
+        }
 
     # ------------------------------------------------------------------
     # OTP & PENDING REGISTRATION OPERATIONS
@@ -378,7 +709,6 @@ class DatabaseManager:
         existing = self.get_chat_by_id(chat_id, user_id)
 
         chat_title = title or (existing.get("title") if existing else "New Conversation")
-        # Auto-generate title from first user message if still default
         if (not chat_title or chat_title == "New Conversation") and messages:
             first_user_msg = next((m for m in messages if m.get("role") == "user"), None)
             if first_user_msg and first_user_msg.get("content"):
